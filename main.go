@@ -92,7 +92,7 @@ func init() {
 	// create gin instance
 	server = gin.Default()
 	// server.Use(gin.Logger())
-	routes.UserRoutes(server, userController)
+	routes.UserRoutes(server, userController, tokenMaker)
 	// server.POST("/register", controllers.UserController.CreateUser())
 
 }

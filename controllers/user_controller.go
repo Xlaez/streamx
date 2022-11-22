@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	config "streamx/configs"
+	"streamx/libs"
 	"streamx/requests"
 	"streamx/services"
 	"streamx/token"
@@ -12,7 +13,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -22,6 +25,9 @@ type UserController interface {
 	VerfiyUser() gin.HandlerFunc
 	GetResetPassword() gin.HandlerFunc
 	ResetPassword() gin.HandlerFunc
+	AskToChangeEmail() gin.HandlerFunc
+	ChangeEmail() gin.HandlerFunc
+	UploadAvatar() gin.HandlerFunc
 }
 
 type userController struct {
@@ -178,6 +184,101 @@ func (c *userController) ResetPassword() gin.HandlerFunc {
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{"success": true})
+	}
+}
+
+func (c *userController) AskToChangeEmail() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request requests.AskToReset
+		if err := ctx.ShouldBindJSON(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		payload := ctx.MustGet("x-auth-token_payload").(*token.Payload)
+
+		if payload.Email == request.Email {
+			ctx.JSON(http.StatusBadRequest, gin.H{"msg": "please provide a different email, this is your current email"})
+			return
+		}
+
+		user, err := c.service.FindOneByEmail(request.Email)
+
+		if err != mongo.ErrNoDocuments && user.Email == "" {
+			ctx.JSON(http.StatusBadRequest, gin.H{"msg": "email taken, please input another"})
+			return
+		}
+
+		randInt := utils.RandomIntegers(6)
+
+		if err = c.redis.Set(ctx, randInt, request.Email, 0).Err(); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		// send email in the future
+
+		ctx.JSON(http.StatusOK, gin.H{"digits": randInt})
+	}
+}
+
+func (c *userController) ChangeEmail() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request requests.VerfiyEmail
+		if err := ctx.ShouldBindUri(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		value, err := c.redis.Get(ctx, request.Digits).Result()
+
+		if err == redis.Nil {
+			ctx.JSON(http.StatusNotFound, errorRes(err))
+			return
+		}
+
+		payload := ctx.MustGet("x-auth-token_payload").(*token.Payload)
+
+		if err = c.service.UpdateEmail(payload.Id, value); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"msg": "updated"})
+	}
+}
+
+func (c *userController) UploadAvatar() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request requests.UploadAvatarReq
+
+		if err := ctx.ShouldBind(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		su, _, e := libs.UploadToCloud(ctx)
+
+		if e != nil {
+			ctx.JSON(http.StatusConflict, errorRes(e))
+			return
+		}
+
+		id, err := primitive.ObjectIDFromHex(request.ID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		filter := bson.D{primitive.E{Key: "_id", Value: id}}
+		updateObj := bson.D{{Key: "$set", Value: bson.D{{Key: "avatar", Value: su}}}}
+
+		if err = c.service.UpdateFields(filter, updateObj); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"msg": "updated"})
 	}
 }
 

@@ -15,6 +15,10 @@ type Verfiy struct {
 	Digits string `json:"digits" binding:"required,min=6,max=6"`
 }
 
+type VerfiyEmail struct {
+	Digits string `uri:"digits" binding:"required,min=6,max=6"`
+}
+
 type AskToReset struct {
 	Email string `uri:"email" binding:"required,email"`
 }
@@ -23,4 +27,8 @@ type ResertPassword struct {
 	OldPassword string `json:"old_password" binding:"required,min=7,alphanum"`
 	NewPassword string `json:"new_password" binding:"required,min=7,alphanum"`
 	Digits      string `json:"digits" binding:"required,min=6,max=6"`
+}
+
+type UploadAvatarReq struct {
+	ID string `form:"id" binding:"required"`
 }

@@ -21,6 +21,8 @@ type UserService interface {
 	FindOneByEmail(email string) (models.User, error)
 	FindOneById(id primitive.ObjectID) (models.User, error)
 	UpdatePassword(email string, password string) error
+	UpdateEmail(id primitive.ObjectID, email string) error
+	UpdateFields(filter primitive.D, updateObj primitive.D) error
 }
 
 type userService struct {
@@ -144,6 +146,29 @@ func (s *userService) UpdatePassword(email string, password string) error {
 	updateObj := bson.D{{Key: "$set", Value: bson.D{{Key: "password", Value: hashedPassword}}}}
 
 	_, err = s.col.UpdateOne(s.ctx, filter, updateObj)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *userService) UpdateEmail(id primitive.ObjectID, email string) error {
+	filter := bson.D{primitive.E{Key: "_id", Value: id}}
+	updateObj := bson.D{{Key: "$set", Value: bson.D{{Key: "email", Value: email}}}}
+
+	_, err := s.col.UpdateOne(s.ctx, filter, updateObj)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *userService) UpdateFields(filter primitive.D, updateObj primitive.D) error {
+	_, err := s.col.UpdateOne(s.ctx, filter, updateObj)
 
 	if err != nil {
 		return err
