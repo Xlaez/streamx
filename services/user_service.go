@@ -5,12 +5,14 @@ import (
 	"errors"
 	"streamx/models"
 	"streamx/requests"
+	"streamx/responses"
 	"streamx/utils"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -23,6 +25,8 @@ type UserService interface {
 	UpdatePassword(email string, password string) error
 	UpdateEmail(id primitive.ObjectID, email string) error
 	UpdateFields(filter primitive.D, updateObj primitive.D) error
+	GetMany(limit *int64, page *int64) ([]responses.GetUser, error)
+	DeleteAcc(id primitive.ObjectID) error
 }
 
 type userService struct {
@@ -169,6 +173,34 @@ func (s *userService) UpdateEmail(id primitive.ObjectID, email string) error {
 
 func (s *userService) UpdateFields(filter primitive.D, updateObj primitive.D) error {
 	_, err := s.col.UpdateOne(s.ctx, filter, updateObj)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *userService) GetMany(limit *int64, page *int64) ([]responses.GetUser, error) {
+	cursor, err := s.col.Find(s.ctx, bson.D{}, &options.FindOptions{Limit: limit, Skip: page})
+
+	if err != nil {
+		return nil, err
+	}
+
+	var user []responses.GetUser
+
+	err = cursor.All(s.ctx, &user)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (s *userService) DeleteAcc(id primitive.ObjectID) error {
+	_, err := s.col.DeleteOne(s.ctx, bson.D{{Key: "_id", Value: id}})
 
 	if err != nil {
 		return err

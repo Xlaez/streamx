@@ -6,6 +6,7 @@ import (
 	config "streamx/configs"
 	"streamx/libs"
 	"streamx/requests"
+	"streamx/responses"
 	"streamx/services"
 	"streamx/token"
 	"streamx/utils"
@@ -28,6 +29,9 @@ type UserController interface {
 	AskToChangeEmail() gin.HandlerFunc
 	ChangeEmail() gin.HandlerFunc
 	UploadAvatar() gin.HandlerFunc
+	GetUserById() gin.HandlerFunc
+	GetUsers() gin.HandlerFunc
+	DeleteAcc() gin.HandlerFunc
 }
 
 type userController struct {
@@ -279,6 +283,102 @@ func (c *userController) UploadAvatar() gin.HandlerFunc {
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{"msg": "updated"})
+	}
+}
+
+func (c *userController) GetUserById() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request requests.GetUserById
+
+		if err := ctx.ShouldBindUri(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		id, err := primitive.ObjectIDFromHex(request.ID)
+
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		user, err := c.service.FindOneById(id)
+
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				ctx.JSON(http.StatusNotFound, errorRes(err))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		userRes := responses.GetUser{
+			Id:        user.Id,
+			Name:      user.Name,
+			Email:     user.Email,
+			Avatar:    user.Avatar,
+			Verified:  user.Verified,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+		}
+		ctx.JSON(http.StatusOK, gin.H{"data": userRes})
+	}
+}
+
+func (c *userController) GetUsers() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request requests.GetUsers
+		if err := ctx.ShouldBindQuery(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		var per_page = (request.Page - 1) * request.Limit
+
+		users, err := c.service.GetMany(&request.Limit, &per_page)
+
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				ctx.JSON(http.StatusNotFound, errorRes(errors.New("cannot find users")))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"data": users})
+	}
+}
+
+func (c *userController) DeleteAcc() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		payload := ctx.MustGet("x-auth-token_payload").(*token.Payload)
+
+		user, err := c.service.FindOneById(payload.Id)
+
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				ctx.JSON(http.StatusNotFound, errorRes(err))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		if user.Avatar != "" {
+			if err = libs.DeleteFromCloud(user.Avatar, ctx); err != nil {
+				ctx.JSON(http.StatusExpectationFailed, errorRes(err))
+				return
+			}
+		}
+
+		if err = c.service.DeleteAcc(user.Id); err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, "successful")
 	}
 }
 

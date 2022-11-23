@@ -32,3 +32,12 @@ type ResertPassword struct {
 type UploadAvatarReq struct {
 	ID string `form:"id" binding:"required"`
 }
+
+type GetUserById struct {
+	ID string `uri:"id" binding:"required"`
+}
+
+type GetUsers struct {
+	Limit int64 `form:"limit" binding:"required"`
+	Page  int64 `form:"page" binding:"required"`
+}

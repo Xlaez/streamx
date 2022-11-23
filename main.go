@@ -20,15 +20,16 @@ import (
 )
 
 var (
-	server         *gin.Engine
-	ctx            context.Context
-	mongoClient    *mongo.Client
-	redisClient    *redis.Client
-	userCol        *mongo.Collection
-	musicCol       *mongo.Collection
-	userController controllers.UserController
-	tokenMaker     token.Maker
-	configg        config.Config
+	server          *gin.Engine
+	ctx             context.Context
+	mongoClient     *mongo.Client
+	redisClient     *redis.Client
+	userCol         *mongo.Collection
+	musicCol        *mongo.Collection
+	userController  controllers.UserController
+	musicController controllers.MusicController
+	tokenMaker      token.Maker
+	configg         config.Config
 )
 
 func initTokenMaker(config config.Config) error {
@@ -91,10 +92,8 @@ func init() {
 	GetCollections(mongoClient, configg)
 	// create gin instance
 	server = gin.Default()
-	// server.Use(gin.Logger())
 	routes.UserRoutes(server, userController, tokenMaker)
-	// server.POST("/register", controllers.UserController.CreateUser())
-
+	routes.MusicRoutes(server, musicController, tokenMaker)
 }
 
 func main() {
@@ -124,8 +123,11 @@ func main() {
 
 func GetCollections(client *mongo.Client, config config.Config) {
 	userCol := client.Database("streamx").Collection("users")
-	// musicCol := client.Database("streamx").Collection("Music")
+	musicCol := client.Database("streamx").Collection("Music")
 
 	userService := services.NewUserService(userCol, ctx)
+	musicService := services.NewMusicService(musicCol, ctx)
 	userController = controllers.NewUserController(userService, tokenMaker, config, redisClient)
+	musicController = controllers.NewMusicController(musicService, tokenMaker, config, redisClient)
+
 }
