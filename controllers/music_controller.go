@@ -20,6 +20,9 @@ import (
 type MusicController interface {
 	UploadMusic() gin.HandlerFunc
 	GetOneMusic() gin.HandlerFunc
+	GetMusics() gin.HandlerFunc
+	GetMusicsByArtist() gin.HandlerFunc
+	DeleteSong() gin.HandlerFunc
 }
 
 type musicController struct {
@@ -101,5 +104,80 @@ func (c *musicController) GetOneMusic() gin.HandlerFunc {
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{"music": music})
+	}
+}
+
+func (c *musicController) GetMusics() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request requests.GetUsers
+		if err := ctx.ShouldBindQuery(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		var per_page = (request.Page - 1) * request.Limit
+
+		musics, err := c.service.GetAll(&request.Limit, &per_page)
+
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				ctx.JSON(http.StatusNotFound, errorRes(err))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, musics)
+	}
+}
+
+func (c *musicController) GetMusicsByArtist() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request requests.GetMusicByArtist
+		if err := ctx.ShouldBindQuery(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		var per_page = (request.Page - 1) * request.Limit
+
+		musics, err := c.service.GetByArtist(request.Artist, &request.Limit, &per_page)
+
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				ctx.JSON(http.StatusNotFound, errorRes(err))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, musics)
+	}
+}
+
+func (c *musicController) DeleteSong() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var request requests.GetOneMusic
+
+		if err := ctx.ShouldBindUri(&request); err != nil {
+			ctx.JSON(http.StatusBadRequest, errorRes(err))
+			return
+		}
+
+		id, err := primitive.ObjectIDFromHex(request.Id)
+
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, errorRes(err))
+			return
+		}
+
+		if err = c.service.DeleteSong(id); err != nil {
+			ctx.JSON(http.StatusNotFound, errorRes(err))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"msg": "deleted"})
 	}
 }
