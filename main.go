@@ -129,5 +129,4 @@ func GetCollections(client *mongo.Client, config config.Config) {
 	musicService := services.NewMusicService(musicCol, ctx)
 	userController = controllers.NewUserController(userService, tokenMaker, config, redisClient)
 	musicController = controllers.NewMusicController(musicService, tokenMaker, config, redisClient)
-
 }

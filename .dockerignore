@@ -1,0 +1,4 @@
+go.sum
+.git
+.gitignore
+.gitlab-ci.yml
