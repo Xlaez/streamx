@@ -1,0 +1,12 @@
+variables:
+  IMAGE_NAME: utibeabasi/streamx
+  IMAGE_TAG: test-0.1.0
+build_image:
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  variables:
+    DOCKER_TLS_CERTDIR: '/certs'
+  scripts:
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG
+    - docker push $IMAGE_NAME:$IMAGE_TAG

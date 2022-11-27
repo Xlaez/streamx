@@ -7,11 +7,13 @@ EXPOSE 8001
 ENV PORT = 8001
 ENV HOST = 0.0.0.0
 
-RUN go mod tidy
+WORKDIR /
 
-RUN mkdir -p /base/app
+COPY . .
 
+RUN go mod download && go mod verify
 
-COPY . /base/app
+# COPY . /base/app
+# RUN go build -v -o /usr/local/bin/app ./...
 
-CMD [ "go", "run", "main.go" ]
+CMD ["go", "run", "main.go" ]
